@@ -14,22 +14,27 @@ import {
   DialogActions,
   Button,
 } from "@mui/material";
+import { useUsers } from "@/services/users/users";
+import { useAddUsersToCompany, useRemoveUserFromCompany } from "@/services/company/company";
 
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 export default function CompanyDrawer({ open, setOpen, company }) {
-  const [users, setUsers] = useState(company?.Users || []);
-  const [deletingId, setDeletingId] = useState(null);
-
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [allUsers, setAllUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
-  const [adding, setAdding] = useState(false);
+
+  const { data: allUsers = [] } = useUsers({ enabled: addOpen });
+
+  const assignedUsers = company?.Users || [];
+  const assignedUserIds = assignedUsers.map((u) => u.id);
+  const availableUsers = allUsers.filter(
+    (user) => !assignedUserIds.includes(user.id),
+  );
 
   const openConfirmDialog = (userId) => {
     setSelectedUserId(userId);
@@ -41,41 +46,34 @@ export default function CompanyDrawer({ open, setOpen, company }) {
     setConfirmOpen(false);
   };
 
-  const handleDeleteUser = async () => {
-    try {
-      setDeletingId(selectedUserId);
+  const deleteUserMutation = useRemoveUserFromCompany();
 
-      const res = await fetch("/api/company-user", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: selectedUserId,
-          companyId: company.id,
-        }),
-      });
+  const closeAddUserModal = () => {
+    setSelectedUsers([]);
+    setAddOpen(false);
+  };
 
-      if (!res.ok) throw new Error("Failed");
+  const addUsersMutation = useAddUsersToCompany();
 
-      setUsers((prev) => prev.filter((u) => u.id !== selectedUserId));
-
-      closeConfirmDialog();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setDeletingId(null);
+  const handleDeleteUser = () => {
+    if (selectedUserId) {
+      deleteUserMutation.mutate(
+        { companyId: company.id, userId: selectedUserId },
+        {
+          onSuccess: () => {
+            closeConfirmDialog();
+          },
+          onError: (error) => {
+            console.error("Delete Error:", error);
+          },
+        },
+      );
     }
   };
 
-  const openAddUserModal = async () => {
-    try {
-      const res = await fetch("/api/users");
-      const data = await res.json();
-
-      setAllUsers(data);
-      setAddOpen(true);
-    } catch (err) {
-      console.error(err);
-    }
+  const openAddUserModal = () => {
+    setSelectedUsers([]);
+    setAddOpen(true);
   };
 
   const toggleUser = (id) => {
@@ -84,33 +82,19 @@ export default function CompanyDrawer({ open, setOpen, company }) {
     );
   };
 
-  const handleAddUsers = async () => {
-    try {
-      setAdding(true);
-
-      const res = await fetch("/api/company-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+  const handleAddUsers = () => {
+    if (selectedUsers.length > 0) {
+      addUsersMutation.mutate(
+        { companyId: company.id, userIds: selectedUsers },
+        {
+          onSuccess: () => {
+            closeAddUserModal();
+          },
+          onError: (error) => {
+            console.error("Add Users Error:", error);
+          },
         },
-        body: JSON.stringify({
-          companyId: company.id,
-          userIds: selectedUsers,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Failed");
-
-      const newUsers = allUsers.filter((u) => selectedUsers.includes(u.id));
-
-      setUsers((prev) => [...prev, ...newUsers]);
-
-      setSelectedUsers([]);
-      setAddOpen(false);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAdding(false);
+      );
     }
   };
 
@@ -123,6 +107,7 @@ export default function CompanyDrawer({ open, setOpen, company }) {
         onOpen={() => setOpen(true)}
       >
         <Box sx={{ width: 400, p: 3 }}>
+          {/* Header */}
           <Box
             sx={{
               display: "flex",
@@ -155,17 +140,20 @@ export default function CompanyDrawer({ open, setOpen, company }) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              mb: 1,
             }}
           >
-            <Typography fontWeight="bold">Users</Typography>
+            <Typography fontWeight="bold">
+              Users ({assignedUsers.length})
+            </Typography>
 
             <IconButton onClick={openAddUserModal}>
               <PersonAddIcon />
             </IconButton>
           </Box>
 
-          {users.length > 0 ? (
-            users.map((user) => (
+          {assignedUsers.length > 0 ? (
+            assignedUsers.map((user) => (
               <Box
                 key={user.id}
                 sx={{
@@ -201,7 +189,9 @@ export default function CompanyDrawer({ open, setOpen, company }) {
                   color="error"
                   size="small"
                   onClick={() => openConfirmDialog(user.id)}
-                  disabled={deletingId === user.id}
+                  disabled={
+                    deleteUserMutation.isPending && selectedUserId === user.id
+                  }
                 >
                   <DeleteIcon />
                 </IconButton>
@@ -217,57 +207,75 @@ export default function CompanyDrawer({ open, setOpen, company }) {
         <DialogTitle>Remove User</DialogTitle>
 
         <DialogContent>
-          Are you sure you want to remove this user?
+          <Typography>
+            Are you sure you want to remove this user from the company?
+          </Typography>
         </DialogContent>
 
         <DialogActions>
           <Button onClick={closeConfirmDialog}>Cancel</Button>
 
-          <Button onClick={handleDeleteUser} color="error" variant="contained">
+          <Button
+            onClick={handleDeleteUser}
+            color="error"
+            variant="contained"
+            disabled={deleteUserMutation.isPending}
+          >
             Delete
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} fullWidth>
+      <Dialog
+        open={addOpen}
+        onClose={closeAddUserModal}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>Add Users to Company</DialogTitle>
 
         <DialogContent>
-          {allUsers.map((user) => (
-            <Box
-              key={user.id}
-              onClick={() => toggleUser(user.id)}
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                p: 1.5,
-                mb: 1,
-                bgcolor: selectedUsers.includes(user.id)
-                  ? "#e3f2fd"
-                  : "#f5f5f5",
-                borderRadius: 2,
-                cursor: "pointer",
-              }}
-            >
-              <Box>
-                <Typography fontWeight={600}>{user.name}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {user.email}
-                </Typography>
+          {availableUsers.length > 0 ? (
+            availableUsers.map((user) => (
+              <Box
+                key={user.id}
+                onClick={() => toggleUser(user.id)}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  p: 1.5,
+                  mb: 1,
+                  bgcolor: selectedUsers.includes(user.id)
+                    ? "#e3f2fd"
+                    : "#f5f5f5",
+                  borderRadius: 2,
+                  cursor: "pointer",
+                }}
+              >
+                <Box>
+                  <Typography fontWeight={600}>{user.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {user.email}
+                  </Typography>
+                </Box>
               </Box>
-            </Box>
-          ))}
+            ))
+          ) : (
+            <Typography color="text.secondary">
+              No available users to add.
+            </Typography>
+          )}
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={() => setAddOpen(false)}>Cancel</Button>
+          <Button onClick={closeAddUserModal}>Cancel</Button>
 
           <Button
             onClick={handleAddUsers}
             variant="contained"
-            disabled={adding}
+            disabled={addUsersMutation.isPending || selectedUsers.length === 0}
           >
-            Add Users
+            {addUsersMutation.isPending ? "Adding..." : "Add Users"}
           </Button>
         </DialogActions>
       </Dialog>

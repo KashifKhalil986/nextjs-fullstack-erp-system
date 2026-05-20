@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useVerifyOtp, useResetPassword, useSendOtp } from "@/services/users/users";
 
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -15,8 +16,6 @@ export default function VerifyOtpPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(60);
   const [message, setMessage] = useState("");
 
@@ -34,92 +33,67 @@ export default function VerifyOtpPage() {
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  const handleVerifyOtp = async () => {
+  const verifyOtpMutation = useVerifyOtp();
+  const resetPasswordMutation = useResetPassword();
+  const sendOtpMutation = useSendOtp();
+
+  const handleVerifyOtp = () => {
     if (otp.length !== 6) {
       setMessage("Enter valid 6-digit OTP");
       return;
     }
 
-    setLoading(true);
     setMessage("");
 
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage("OTP Verified");
-        setStep(2);
-      } else {
-        setMessage(data.message);
+    verifyOtpMutation.mutate(
+      { email, otp },
+      {
+        onSuccess: () => {
+          setMessage("OTP Verified");
+          setStep(2);
+        },
+        onError: (error) => {
+          setMessage(error.message || "Invalid OTP");
+        },
       }
-    } catch (err) {
-      setMessage("Server error");
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
-  const handleResetPassword = async () => {
+  const handleResetPassword = () => {
     if (newPassword !== confirmPassword) {
       setMessage("Passwords do not match");
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp, newPassword }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage("Password reset successful");
-        setTimeout(() => router.push("/login"), 2000);
-      } else {
-        setMessage(data.message);
+    resetPasswordMutation.mutate(
+      { email, otp, newPassword },
+      {
+        onSuccess: () => {
+          setMessage("Password reset successful");
+          setTimeout(() => router.push("/login"), 2000);
+        },
+        onError: (error) => {
+          setMessage(error.message || "Failed to reset password");
+        },
       }
-    } catch (err) {
-      setMessage("Server error");
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
-  const handleResendOtp = async () => {
-    if (cooldown > 0 || resending) return;
+  const handleResendOtp = () => {
+    if (cooldown > 0 || sendOtpMutation.isPending) return;
 
-    setResending(true);
-
-    try {
-      const res = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage("OTP sent again");
-        setCooldown(60);
-      } else {
-        setMessage(data.message);
+    sendOtpMutation.mutate(
+      { email },
+      {
+        onSuccess: () => {
+          setMessage("OTP sent again");
+          setCooldown(60);
+        },
+        onError: (error) => {
+          setMessage(error.message || "Failed to resend OTP");
+        },
       }
-    } catch (err) {
-      setMessage("Failed to resend OTP");
-    } finally {
-      setResending(false);
-    }
+    );
   };
 
   return (
@@ -142,19 +116,19 @@ export default function VerifyOtpPage() {
 
             <button
               onClick={handleVerifyOtp}
-              disabled={loading}
+              disabled={verifyOtpMutation.isPending}
               className="w-full bg-blue-600 text-white p-2 rounded"
             >
-              {loading ? "Verifying..." : "Verify OTP"}
+              {verifyOtpMutation.isPending ? "Verifying..." : "Verify OTP"}
             </button>
 
             <div className="text-center mt-4">
               <button
                 onClick={handleResendOtp}
-                disabled={cooldown > 0 || resending}
+                disabled={cooldown > 0 || sendOtpMutation.isPending}
                 className="text-sm text-blue-600 disabled:text-gray-400"
               >
-                {resending
+                {sendOtpMutation.isPending
                   ? "Resending..."
                   : cooldown > 0
                     ? `Resend OTP in ${cooldown}s`
@@ -184,10 +158,10 @@ export default function VerifyOtpPage() {
 
             <button
               onClick={handleResetPassword}
-              disabled={loading}
+              disabled={resetPasswordMutation.isPending}
               className="w-full bg-green-600 text-white p-2 rounded"
             >
-              {loading ? "Updating..." : "Reset Password"}
+              {resetPasswordMutation.isPending ? "Updating..." : "Reset Password"}
             </button>
           </>
         )}
@@ -197,5 +171,19 @@ export default function VerifyOtpPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className="bg-white w-full max-w-md p-6 rounded-xl shadow text-center">
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    }>
+      <VerifyOtpContent />
+    </Suspense>
   );
 }

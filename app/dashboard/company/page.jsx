@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUsers } from "@/services/users/users";
+import { useCreateCompany } from "@/services/company/company";
 
 export default function CreateCompanyPage() {
   const router = useRouter();
@@ -12,30 +14,11 @@ export default function CreateCompanyPage() {
     location: "",
   });
 
-  const [users, setUsers] = useState([]);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
-
-  const [loading, setLoading] = useState(false);
-  const [fetchingUsers, setFetchingUsers] = useState(true);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const res = await fetch("/api/users");
-        if (res.ok) {
-          const data = await res.json();
-          setUsers(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch users", error);
-      } finally {
-        setFetchingUsers(false);
-      }
-    };
-
-    fetchUsers();
-  }, [router]);
+  const { data: users = [], isLoading: fetchingUsers } = useUsers();
+  const createCompanyMutation = useCreateCompany();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -58,38 +41,30 @@ export default function CreateCompanyPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
     setMessage({ type: "", text: "" });
-
-    try {
-      const res = await fetch("/api/company", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          users: selectedUserIds,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage({ type: "success", text: "Company created successfully!" });
-
-        setTimeout(() => router.push("/dashboard"), 2000);
-      } else {
-        setMessage({
-          type: "error",
-          text: data.error || "Something went wrong",
-        });
-      }
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to connect to server" });
-    } finally {
-      setLoading(false);
-    }
+    createCompanyMutation.mutate(
+      {
+        ...formData,
+        users: selectedUserIds,
+      },
+      {
+        onSuccess: () => {
+          setMessage({
+            type: "success",
+            text: "Company created successfully!",
+          });
+          setTimeout(() => router.push("/dashboard"), 2000);
+        },
+        onError: (error) => {
+          setMessage({
+            type: "error",
+            text: error.message || "Failed to connect to server",
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -266,17 +241,16 @@ export default function CreateCompanyPage() {
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={createCompanyMutation.isPending}
               className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-95 ${
-                loading
+                createCompanyMutation.isPending
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200"
               }`}
             >
-              {loading ? (
+              {createCompanyMutation.isPending ? (
                 <span className="flex items-center justify-center">
                   <svg
                     className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"

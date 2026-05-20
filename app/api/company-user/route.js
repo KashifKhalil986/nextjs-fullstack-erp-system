@@ -75,7 +75,7 @@ export async function POST(req) {
         { status: 404 },
       );
     }
-
+    console.log(JSON.stringify(company));
     await company.addUsers(users);
 
     return NextResponse.json({

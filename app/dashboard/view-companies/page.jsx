@@ -1,43 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCompanies } from "@/services/company/company";
 import CompanyDrawer from "../../components/CompanyDrawer";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 
 export default function ViewCompaniesPage() {
   const router = useRouter();
 
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { data: companies = [], isLoading: loading, error } = useCompanies();
 
   const [open, setOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(null);
 
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const res = await fetch("/api/company");
-
-        if (res.ok) {
-          const data = await res.json();
-          setCompanies(data);
-        } else {
-          setError("Failed to fetch companies");
-        }
-      } catch (err) {
-        setError("An error occurred while fetching companies");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCompanies();
-  }, []);
+  const selectedCompany = companies.find((c) => c.id === selectedCompanyId) || null;
 
   const handleOpenDrawer = (company) => {
-    setSelectedCompany(company);
+    setSelectedCompanyId(company.id);
     setOpen(true);
   };
 
@@ -65,7 +45,7 @@ export default function ViewCompaniesPage() {
         {loading ? (
           <p>Loading...</p>
         ) : error ? (
-          <p className="text-red-600">{error}</p>
+          <p className="text-red-600">{error.message}</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {companies.map((company) => (

@@ -1,42 +1,27 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCurrentUser, useLogout } from "@/services/users/users";
 
 export default function Home() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useCurrentUser();
+  const logoutMutation = useLogout();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch("/api/auth/me");
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error("Failed to fetch user:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const user = data?.user;
 
-    fetchUser();
-  }, []);
-
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      setUser(null);
-      router.replace("/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        router.replace("/login");
+      },
+      onError: (error) => {
+        console.error("Logout failed:", error);
+      },
+    });
   };
 
-  if (loading) return null;
+  if (isLoading) return null;
 
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 font-sans dark:from-zinc-900 dark:via-black dark:to-zinc-950 p-6">
@@ -100,7 +85,7 @@ export default function Home() {
             )}
 
             <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-10">
-              We're glad to have you here. Explore your personalized dashboard
+              {"We're"} glad to have you here. Explore your personalized dashboard
               and manage your workspace effortlessly.
             </p>
 
