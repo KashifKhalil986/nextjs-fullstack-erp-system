@@ -10,6 +10,13 @@ const CompanyFactory = (sequelize, DataTypes) => {
         as: "Users",
       });
 
+      Company.belongsToMany(models.Service, {
+        through: "CompanyServices",
+        foreignKey: "companyId",
+        otherKey: "serviceId",
+        as: "Services",
+      });
+
       Company.belongsTo(models.User, {
         foreignKey: "createdBy",
         as: "owner",

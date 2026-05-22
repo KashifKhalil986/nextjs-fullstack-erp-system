@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import { useUsers } from "@/services/users/users";
 import { useCreateCompany } from "@/services/company/company";
 
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
+  OutlinedInput,
+} from "@mui/material";
+
 export default function CreateCompanyPage() {
   const router = useRouter();
 
@@ -18,32 +28,26 @@ export default function CreateCompanyPage() {
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const { data: users = [], isLoading: fetchingUsers } = useUsers();
+
   const createCompanyMutation = useCreateCompany();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
 
-  const toggleUserSelection = (userId) => {
-    setSelectedUserIds((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId],
-    );
-  };
-
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedUserIds(users.map((u) => u.id));
-    } else {
-      setSelectedUserIds([]);
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setMessage({ type: "", text: "" });
+
+    setMessage({
+      type: "",
+      text: "",
+    });
+
     createCompanyMutation.mutate(
       {
         ...formData,
@@ -55,8 +59,12 @@ export default function CreateCompanyPage() {
             type: "success",
             text: "Company created successfully!",
           });
-          setTimeout(() => router.push("/dashboard"), 2000);
+
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 2000);
         },
+
         onError: (error) => {
           setMessage({
             type: "error",
@@ -95,6 +103,7 @@ export default function CreateCompanyPage() {
             <h1 className="text-2xl font-bold text-white text-center">
               Create New Company
             </h1>
+
             <p className="text-indigo-100 text-center mt-1">
               Register your business and assign team members
             </p>
@@ -105,6 +114,7 @@ export default function CreateCompanyPage() {
               <h2 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-2">
                 Company Details
               </h2>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="col-span-2 md:col-span-1">
                   <label
@@ -113,6 +123,7 @@ export default function CreateCompanyPage() {
                   >
                     Company Name
                   </label>
+
                   <input
                     type="text"
                     id="name"
@@ -124,6 +135,7 @@ export default function CreateCompanyPage() {
                     placeholder="Acme Corp"
                   />
                 </div>
+
                 <div className="col-span-2 md:col-span-1">
                   <label
                     htmlFor="email"
@@ -131,6 +143,7 @@ export default function CreateCompanyPage() {
                   >
                     Company Email
                   </label>
+
                   <input
                     type="email"
                     id="email"
@@ -142,6 +155,7 @@ export default function CreateCompanyPage() {
                     placeholder="contact@acme.com"
                   />
                 </div>
+
                 <div className="col-span-2">
                   <label
                     htmlFor="location"
@@ -149,6 +163,7 @@ export default function CreateCompanyPage() {
                   >
                     Location
                   </label>
+
                   <input
                     type="text"
                     id="location"
@@ -167,66 +182,55 @@ export default function CreateCompanyPage() {
                 <h2 className="text-lg font-semibold text-gray-900">
                   Assign Users
                 </h2>
+
                 <div className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
                   {selectedUserIds.length} Selected
                 </div>
               </div>
 
-              <div className="flex items-center px-4 py-2 bg-gray-50 rounded-lg">
-                <input
-                  type="checkbox"
-                  id="selectAll"
-                  onChange={handleSelectAll}
-                  checked={
-                    users.length > 0 && selectedUserIds.length === users.length
-                  }
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <label
-                  htmlFor="selectAll"
-                  className="ml-3 text-sm font-medium text-gray-700 cursor-pointer"
-                >
-                  Select All Users
-                </label>
-              </div>
+              {fetchingUsers ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mb-2"></div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                {fetchingUsers ? (
-                  <div className="col-span-2 text-center py-8">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600 mb-2"></div>
-                    <p className="text-gray-500">Loading users...</p>
-                  </div>
-                ) : users.length === 0 ? (
-                  <p className="col-span-2 text-center py-8 text-gray-500">
-                    No users found.
-                  </p>
-                ) : (
-                  users.map((user) => (
-                    <div
-                      key={user.id}
-                      onClick={() => toggleUserSelection(user.id)}
-                      className={`flex items-center p-4 rounded-xl border transition-all cursor-pointer ${
-                        selectedUserIds.includes(user.id)
-                          ? "bg-indigo-50 border-indigo-200 shadow-sm"
-                          : "bg-white border-gray-100 hover:border-gray-300 shadow-sm"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.includes(user.id)}
-                        onChange={() => {}} // Handled by div click
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <div className="ml-4">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {user.name}
-                        </p>
-                        <p className="text-xs text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                  <p className="text-gray-500">Loading users...</p>
+                </div>
+              ) : (
+                <FormControl fullWidth>
+                  <InputLabel id="users-select-label">Select Users</InputLabel>
+
+                  <Select
+                    labelId="users-select-label"
+                    multiple
+                    value={selectedUserIds}
+                    onChange={(e) => setSelectedUserIds(e.target.value)}
+                    input={<OutlinedInput label="Select Users" />}
+                    renderValue={(selected) =>
+                      users
+                        .filter((user) => selected.includes(user.id))
+                        .map((user) => user.name)
+                        .join(", ")
+                    }
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 300,
+                        },
+                      },
+                    }}
+                  >
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        <Checkbox checked={selectedUserIds.includes(user.id)} />
+
+                        <ListItemText
+                          primary={user.name}
+                          secondary={user.email}
+                        />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
             </div>
 
             {message.text && (
@@ -265,6 +269,7 @@ export default function CreateCompanyPage() {
                       stroke="currentColor"
                       strokeWidth="4"
                     ></circle>
+
                     <path
                       className="opacity-75"
                       fill="currentColor"

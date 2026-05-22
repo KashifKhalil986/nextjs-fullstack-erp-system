@@ -17,6 +17,12 @@ export async function GET() {
           as: "owner",
           attributes: ["id", "name", "email"],
         },
+        {
+          model: db.Service,
+          as: "Services",
+          attributes: ["id", "name", "description"],
+          through: { attributes: [] },
+        },
       ],
       order: [["createdAt", "DESC"]],
     });
