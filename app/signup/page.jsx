@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useSignup } from "@/services/users/users";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -13,30 +14,24 @@ export default function SignupPage() {
 
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSignup = async (e) => {
+  const signupMutation = useSignup();
+
+  const handleSignup = (e) => {
     e.preventDefault();
 
-    try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    signupMutation.mutate(
+      { name, email, password },
+      {
+        onSuccess: () => {
+          alert("Signup successful! Please login.");
+          router.replace("/login");
         },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert("Signup successful! Please login.");
-        router.replace("/login");
-      } else {
-        alert(data.message || "Invalid Email");
+        onError: (error) => {
+          console.error("Signup error:", error);
+          alert(error.message || "Signup failed");
+        },
       }
-    } catch (error) {
-      console.error("Signup error:", error);
-      alert("An error occurred during signup");
-    }
+    );
   };
 
   return (
@@ -84,9 +79,10 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700"
+            disabled={signupMutation.isPending}
+            className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Create Account
+            {signupMutation.isPending ? "Creating Account..." : "Create Account"}
           </button>
         </form>
 

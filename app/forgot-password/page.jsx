@@ -3,44 +3,37 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSendOtp } from "@/services/users/users";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const router = useRouter();
 
-  const handleSubmit = async (e) => {
+  const sendOtpMutation = useSendOtp();
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
     setMessage({ type: "", text: "" });
 
-    try {
-      const res = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+    sendOtpMutation.mutate(
+      { email },
+      {
+        onSuccess: (data) => {
+          setMessage({ type: "success", text: data.message || "OTP sent successfully" });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage({ type: "success", text: data.message });
-
-        setTimeout(() => {
-          router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
-        }, 2000);
-      } else {
-        setMessage({
-          type: "error",
-          text: data.message || "Something went wrong",
-        });
+          setTimeout(() => {
+            router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
+          }, 2000);
+        },
+        onError: (error) => {
+          setMessage({
+            type: "error",
+            text: error.message || "Failed to send OTP",
+          });
+        },
       }
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to connect to the server" });
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
   return (
@@ -51,7 +44,7 @@ export default function ForgotPasswordPage() {
             Forgot Password?
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Enter your email and we'll send you an OTP to reset your password.
+            Enter your email and {"we'll"} send you an OTP to reset your password.
           </p>
         </div>
 
@@ -88,10 +81,10 @@ export default function ForgotPasswordPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={sendOtpMutation.isPending}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {loading ? (
+              {sendOtpMutation.isPending ? (
                 <span className="flex items-center">
                   <svg
                     className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
