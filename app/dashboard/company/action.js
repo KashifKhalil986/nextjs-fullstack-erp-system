@@ -13,13 +13,13 @@ export async function createCompany(data) {
       };
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return {
-        success: false,
-        message: "Please enter a valid email address.",
-      };
-    }
+    // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // if (!emailRegex.test(email)) {
+    //   return {
+    //     success: false,
+    //     message: "Please enter a valid email address.",
+    //   };
+    // }
 
     const company = await db.Company.create({
       name,
@@ -28,7 +28,7 @@ export async function createCompany(data) {
     });
 
     if (users && users.length > 0) {
-      await company.addUsers(users); // Sequelize many-to-many
+      await company.addUsers(users); 
     }
 
     revalidatePath("/dashboard");

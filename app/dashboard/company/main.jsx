@@ -55,7 +55,7 @@ export default function CreateCompanyComponent({ users }) {
 
         setTimeout(() => {
           router.push("/dashboard");
-        }, 1500);
+        }, 1000);
       } catch (error) {
         setMessage({
           type: "error",
@@ -131,7 +131,7 @@ export default function CreateCompanyComponent({ users }) {
               </Select>
             </FormControl>
 
-            {/* MESSAGE */}
+         
             {message.text && (
               <div
                 className={`p-3 rounded-lg text-center ${
@@ -144,7 +144,7 @@ export default function CreateCompanyComponent({ users }) {
               </div>
             )}
 
-            {/* BUTTON */}
+        
             <button
               disabled={isPending}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold disabled:opacity-50"
