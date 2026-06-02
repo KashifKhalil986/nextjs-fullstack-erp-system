@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+
 import {
   FormControl,
   InputLabel,
@@ -42,30 +43,37 @@ export default function CreateCompanyComponent({ users }) {
     setMessage({ type: "", text: "" });
 
     startTransition(async () => {
-      try {
-        await createCompany({
-          ...formData,
-          users: selectedUserIds,
-        });
+      const result = await createCompany({
+        ...formData,
+        users: selectedUserIds,
+      });
+      console.log(result);
 
-        setMessage({
-          type: "success",
-          text: "Company created successfully!",
-        });
-
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 1000);
-      } catch (error) {
+      if (!result.success) {
         setMessage({
           type: "error",
-          text: error.message || "Something went wrong",
+          text:
+            result.message ||
+            Object.values(result.errors || {})
+              .flat()
+              .join(", "),
         });
+
+        return;
       }
+
+      setMessage({
+        type: "success",
+        text: "Company created successfully!",
+      });
+
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
     });
   };
 
-  console.log("usrrs:--", users);
+  // console.log("usrrs:--", users);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -131,7 +139,6 @@ export default function CreateCompanyComponent({ users }) {
               </Select>
             </FormControl>
 
-         
             {message.text && (
               <div
                 className={`p-3 rounded-lg text-center ${
@@ -144,7 +151,6 @@ export default function CreateCompanyComponent({ users }) {
               </div>
             )}
 
-        
             <button
               disabled={isPending}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold disabled:opacity-50"
