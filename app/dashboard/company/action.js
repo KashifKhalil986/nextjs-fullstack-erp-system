@@ -2,33 +2,31 @@
 
 import db from "@/models";
 import { revalidatePath } from "next/cache";
-import { companySchema } from "./schema";
+import { companySchema } from "./validations";
 import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/auth";
 
+async function getUserIdFromToken() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) return null;
+
+  const decoded = verifyToken(token);
+  if (!decoded?.id) return null;
+
+  return decoded.id;
+}
+
 export async function createCompany(data) {
   try {
-    // console.log("data---", data);
+    const userId = await getUserIdFromToken();
 
-    const cookieStore = await cookies();
-    const token = cookieStore.get("token")?.value;
-
-    if (!token) {
-      return {
-        success: false,
-        message: "Unauthorized: No active session found.",
-      };
-    }
-
-    const decoded = verifyToken(token);
-    if (!decoded || !decoded.id) {
-      return {
-        success: false,
-        message: "Unauthorized: Invalid or expired session.",
-      };
+    if (!userId) {
+      return { success: false, message: "Unauthorized" };
     }
 
     const validationResult = companySchema.safeParse(data);
+
     if (!validationResult.success) {
       return {
         success: false,
@@ -41,31 +39,26 @@ export async function createCompany(data) {
     const existingCompany = await db.Company.findOne({
       where: { email },
     });
+
     if (existingCompany) {
-      return {
-        success: false,
-        message: "company email already exits",
-      };
+      return { success: false, message: "company email already exits" };
     }
 
     const company = await db.Company.create({
       name,
       email,
       location,
-      createdBy: decoded.id,
+      createdBy: userId,
     });
-    if (users && users.length > 0) {
+
+    if (users?.length) {
       await company.addUsers(users);
     }
 
     revalidatePath("/dashboard");
 
-    return { success: true };
+    return { success: true, message: "Company created successfully" };
   } catch (error) {
-    console.error(error);
-    return {
-      success: false,
-      message: error.message,
-    };
+    return { success: false, message: error.message };
   }
 }

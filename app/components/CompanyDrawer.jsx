@@ -15,16 +15,35 @@ import {
   Button,
 } from "@mui/material";
 import { useUsers } from "@/services/users/users";
-import { useAddUsersToCompany, useRemoveUserFromCompany } from "@/services/company/company";
-import { useServices, useAddServicesToCompany, useRemoveServiceFromCompany } from "@/services/services/services";
+import {
+  useAddUsersToCompany,
+  useRemoveUserFromCompany,
+} from "@/services/company/company";
+import {
+  useServices,
+  useAddServicesToCompany,
+  useRemoveServiceFromCompany,
+} from "@/services/services/services";
 
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import {
+  addServicesToCompany,
+  addUserToCompany,
+  removedUserFromCompany,
+  removeServiceFromCompany,
+} from "../dashboard/view-companies/actions";
 
-export default function CompanyDrawer({ open, setOpen, company }) {
+export default function CompanyDrawer({
+  open,
+  setOpen,
+  company,
+  users,
+  services,
+}) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
 
@@ -37,8 +56,11 @@ export default function CompanyDrawer({ open, setOpen, company }) {
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState([]);
 
-  const { data: allUsers = [] } = useUsers({ enabled: addOpen });
-  const { data: allServices = [] } = useServices({ enabled: addServiceOpen });
+  // const { data: allUsers = [] } = useUsers({ enabled: addOpen });
+  // const { data: allServices = [] } = useServices({ enabled: addServiceOpen });
+
+  const allUsers = users || [];
+  const allServices = services || [];
 
   const assignedUsers = company?.Users || [];
   const assignedUserIds = assignedUsers.map((u) => u.id);
@@ -73,19 +95,23 @@ export default function CompanyDrawer({ open, setOpen, company }) {
   const addUsersMutation = useAddUsersToCompany();
   const addServicesMutation = useAddServicesToCompany();
 
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (selectedUserId) {
-      deleteUserMutation.mutate(
-        { companyId: company.id, userId: selectedUserId },
-        {
-          onSuccess: () => {
-            closeConfirmDialog();
-          },
-          onError: (error) => {
-            console.error("Delete Error:", error);
-          },
-        },
-      );
+      // deleteUserMutation.mutate(
+      //   { companyId: company.id, userId: selectedUserId },
+      //   {
+      //     onSuccess: () => {
+      //       closeConfirmDialog();
+      //     },
+      //     onError: (error) => {
+      //       console.error("Delete Error:", error);
+      //     },
+      //   },
+      // );
+      const result = await removedUserFromCompany(company.id, selectedUserId);
+      if (result.success) {
+        closeConfirmDialog();
+      }
     }
   };
 
@@ -100,19 +126,23 @@ export default function CompanyDrawer({ open, setOpen, company }) {
     );
   };
 
-  const handleAddUsers = () => {
+  const handleAddUsers = async () => {
     if (selectedUsers.length > 0) {
-      addUsersMutation.mutate(
-        { companyId: company.id, userIds: selectedUsers },
-        {
-          onSuccess: () => {
-            closeAddUserModal();
-          },
-          onError: (error) => {
-            console.error("Add Users Error:", error);
-          },
-        },
-      );
+      const result = await addUserToCompany(company.id, selectedUsers);
+      if (result.success) {
+        closeAddUserModal();
+      }
+      // addUsersMutation.mutate(
+      //   { companyId: company.id, userIds: selectedUsers },
+      //   {
+      //     onSuccess: () => {
+      //       closeAddUserModal();
+      //     },
+      //     onError: (error) => {
+      //       console.error("Add Users Error:", error);
+      //     },
+      //   },
+      // );
     }
   };
 
@@ -126,19 +156,26 @@ export default function CompanyDrawer({ open, setOpen, company }) {
     setConfirmServiceOpen(false);
   };
 
-  const handleDeleteService = () => {
+  const handleDeleteService = async () => {
     if (selectedServiceId) {
-      deleteServiceMutation.mutate(
-        { companyId: company.id, serviceId: selectedServiceId },
-        {
-          onSuccess: () => {
-            closeConfirmServiceDialog();
-          },
-          onError: (error) => {
-            console.error("Delete Service Error:", error);
-          },
-        },
+      // deleteServiceMutation.mutate(
+      //   { companyId: company.id, serviceId: selectedServiceId },
+      //   {
+      //     onSuccess: () => {
+      //       closeConfirmServiceDialog();
+      //     },
+      //     onError: (error) => {
+      //       console.error("Delete Service Error:", error);
+      //     },
+      //   },
+      // );
+      const result = await removeServiceFromCompany(
+        company.id,
+        selectedServiceId,
       );
+      if (result.success) {
+        closeConfirmServiceDialog();
+      }
     }
   };
 
@@ -158,21 +195,27 @@ export default function CompanyDrawer({ open, setOpen, company }) {
     );
   };
 
-  const handleAddServices = () => {
+  const handleAddServices = async () => {
     if (selectedServices.length > 0) {
-      addServicesMutation.mutate(
-        { companyId: company.id, serviceIds: selectedServices },
-        {
-          onSuccess: () => {
-            closeAddServiceModal();
-          },
-          onError: (error) => {
-            console.error("Add Services Error:", error);
-          },
-        },
-      );
+      // addServicesMutation.mutate(
+      //   { companyId: company.id, serviceIds: selectedServices },
+      //   {
+      //     onSuccess: () => {
+      //       closeAddServiceModal();
+      //     },
+      //     onError: (error) => {
+      //       console.error("Add Services Error:", error);
+      //     },
+      //   },
+      // );
+      const result = await addServicesToCompany(company.id, selectedServices);
+      if (result.success) {
+        closeAddServiceModal();
+      }
     }
   };
+
+  //   console.log("company inside drawer:---", company);
 
   return (
     <>
@@ -274,7 +317,9 @@ export default function CompanyDrawer({ open, setOpen, company }) {
               </Box>
             ))
           ) : (
-            <Typography color="text.secondary" sx={{ mb: 2 }}>No users assigned</Typography>
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              No users assigned
+            </Typography>
           )}
 
           <Divider sx={{ my: 2 }} />
@@ -323,9 +368,20 @@ export default function CompanyDrawer({ open, setOpen, company }) {
                   </Avatar>
 
                   <Box>
-                    <Typography fontWeight={600} color="#581c87">{service.name}</Typography>
+                    <Typography fontWeight={600} color="#581c87">
+                      {service.name}
+                    </Typography>
                     {service.description && (
-                      <Typography variant="body2" color="text.secondary" sx={{ lineClamp: 1, display: '-webkit-box', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{
+                          lineClamp: 1,
+                          display: "-webkit-box",
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
                         {service.description}
                       </Typography>
                     )}
@@ -337,7 +393,8 @@ export default function CompanyDrawer({ open, setOpen, company }) {
                   size="small"
                   onClick={() => openConfirmServiceDialog(service.id)}
                   disabled={
-                    deleteServiceMutation.isPending && selectedServiceId === service.id
+                    deleteServiceMutation.isPending &&
+                    selectedServiceId === service.id
                   }
                 >
                   <DeleteIcon />
@@ -481,16 +538,29 @@ export default function CompanyDrawer({ open, setOpen, company }) {
                   cursor: "pointer",
                   transition: "all 0.2s",
                   "&:hover": {
-                    bgcolor: selectedServices.includes(service.id) ? "#f3e8ff" : "#ebebeb",
-                  }
+                    bgcolor: selectedServices.includes(service.id)
+                      ? "#f3e8ff"
+                      : "#ebebeb",
+                  },
                 }}
               >
                 <Box>
-                  <Typography fontWeight={600} color={selectedServices.includes(service.id) ? "#6b21a8" : "inherit"}>
+                  <Typography
+                    fontWeight={600}
+                    color={
+                      selectedServices.includes(service.id)
+                        ? "#6b21a8"
+                        : "inherit"
+                    }
+                  >
                     {service.name}
                   </Typography>
                   {service.description && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 0.5 }}
+                    >
                       {service.description}
                     </Typography>
                   )}
@@ -511,7 +581,9 @@ export default function CompanyDrawer({ open, setOpen, company }) {
             onClick={handleAddServices}
             variant="contained"
             color="primary"
-            disabled={addServicesMutation.isPending || selectedServices.length === 0}
+            disabled={
+              addServicesMutation.isPending || selectedServices.length === 0
+            }
           >
             {addServicesMutation.isPending ? "Assigning..." : "Assign Services"}
           </Button>
