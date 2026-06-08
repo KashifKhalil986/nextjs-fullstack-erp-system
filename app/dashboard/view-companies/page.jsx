@@ -3,8 +3,13 @@ import db from "@/models";
 import ViewCompaniesComponent from "./main";
 
 export default async function ViewCompanyPage() {
+  let companies = [];
+  let users = [];
+  let services = [];
+  let errorMsg = null;
+
   try {
-    const companies = await db.Company.findAll({
+    const companiesData = await db.Company.findAll({
       include: [
         {
           model: db.User,
@@ -16,20 +21,28 @@ export default async function ViewCompanyPage() {
         },
       ],
     });
-    const users = await db.User.findAll({
+    companies = JSON.parse(JSON.stringify(companiesData));
+
+    const usersData = await db.User.findAll({
       attributes: ["id", "name", "email"],
     });
+    users = JSON.parse(JSON.stringify(usersData));
 
-    const services = await db.Service.findAll();
-
-    return (
-      <ViewCompaniesComponent
-        companies={JSON.parse(JSON.stringify(companies))}
-        users={JSON.parse(JSON.stringify(users))}
-        services={JSON.parse(JSON.stringify(services))}
-      />
-    );
+    const servicesData = await db.Service.findAll();
+    services = JSON.parse(JSON.stringify(servicesData));
   } catch (error) {
-    return <p className="text-red-500">{error.message}</p>;
+    errorMsg = error.message;
   }
+
+  if (errorMsg) {
+    return <p className="text-red-500">{errorMsg}</p>;
+  }
+
+  return (
+    <ViewCompaniesComponent
+      companies={companies}
+      users={users}
+      services={services}
+    />
+  );
 }
