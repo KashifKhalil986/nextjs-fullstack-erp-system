@@ -1,42 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useCurrentUser, useLogout } from "@/services/users/users";
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const { data, isLoading } = useCurrentUser();
+  const logoutMutation = useLogout();
+
+  const user = data?.user;
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch("/api/auth/me");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.user.role !== "admin") {
-            router.push("/");
-            return;
-          }
-          setUser(data.user);
-        } else {
-          router.push("/login");
-        }
-      } catch (error) {
-        console.error("Failed to fetch user:", error);
+    if (!isLoading) {
+      if (!user) {
         router.push("/login");
+      } else if (user.role !== "admin") {
+        router.push("/");
       }
-    };
-
-    fetchUser();
-  }, [router]);
-
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.push("/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
     }
+  }, [user, isLoading, router]);
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        router.push("/login");
+      },
+      onError: (error) => {
+        console.error("Logout failed:", error);
+      },
+    });
   };
 
   return (

@@ -1,0 +1,14 @@
+.git
+.gitignore
+.gitlab-ci.yml
+.next
+node_modules
+coverage
+out
+build
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+README.md

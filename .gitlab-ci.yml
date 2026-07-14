@@ -1,0 +1,141 @@
+stages:
+  - build
+  - deploy
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - when: never
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  IMAGE_STABLE_TAG: "main"
+  PRODUCTION_URL: "https://alphabuiltconsultants.com"
+  AZURE_WEBAPP_URL: "https://alphabuilt-portfolio-webapp-h3hkgbgtfwhmata3.eastus-01.azurewebsites.net"
+
+build_container:
+  image: docker:27.5.1-cli
+  stage: build
+  services:
+    - name: docker:27.5.1-dind
+      alias: docker
+      command: ["--tls=false"]
+  before_script:
+    - apk add --no-cache curl ca-certificates
+    - test -f Dockerfile || (echo "Dockerfile is required." && exit 1)
+    - test -n "$CONTAINER_REGISTRY" || (echo "CONTAINER_REGISTRY must be set to your container registry login server, for example myregistry.azurecr.io." && exit 1)
+    - test -n "$CONTAINER_REGISTRY_USER" || (echo "CONTAINER_REGISTRY_USER must be set in GitLab CI/CD variables." && exit 1)
+    - test -n "$CONTAINER_REGISTRY_PASSWORD" || (echo "CONTAINER_REGISTRY_PASSWORD must be set in GitLab CI/CD variables." && exit 1)
+    - test -n "$CONTAINER_IMAGE_NAME" || (echo "CONTAINER_IMAGE_NAME must be set in GitLab CI/CD variables." && exit 1)
+    - test -n "$DATABASE_URL" || (echo "DATABASE_URL must be set in GitLab CI/CD variables." && exit 1)
+    - test -n "$JWT_SECRET" || (echo "JWT_SECRET must be set in GitLab CI/CD variables." && exit 1)
+    - export CONTAINER_REGISTRY="${CONTAINER_REGISTRY#https://}"
+    - export CONTAINER_REGISTRY="${CONTAINER_REGISTRY#http://}"
+    - export CONTAINER_REGISTRY="${CONTAINER_REGISTRY%/}"
+    - docker info
+    - |
+      registry_status="$(
+        curl --silent --show-error --output /dev/null --write-out "%{http_code}" \
+          --connect-timeout 15 \
+          "https://${CONTAINER_REGISTRY}/v2/" || true
+      )"
+      case "$registry_status" in
+        200|401) ;;
+        *)
+          echo "Container registry ${CONTAINER_REGISTRY} is not reachable from this runner (HTTP ${registry_status:-000})."
+          exit 1
+          ;;
+      esac
+    - echo "$CONTAINER_REGISTRY_PASSWORD" | docker login "$CONTAINER_REGISTRY" --username "$CONTAINER_REGISTRY_USER" --password-stdin
+  script:
+    - export IMAGE_REPOSITORY="$CONTAINER_IMAGE_NAME"
+    - export IMAGE_REPOSITORY="${IMAGE_REPOSITORY#DOCKER|}"
+    - export IMAGE_REPOSITORY="${IMAGE_REPOSITORY#docker|}"
+    - export IMAGE_REPOSITORY="${IMAGE_REPOSITORY#https://}"
+    - export IMAGE_REPOSITORY="${IMAGE_REPOSITORY#http://}"
+    - export IMAGE_REPOSITORY="${IMAGE_REPOSITORY%/}"
+    - export IMAGE_REPOSITORY="${IMAGE_REPOSITORY%@*}"
+    - |
+      image_tail="${IMAGE_REPOSITORY##*/}"
+      case "$image_tail" in
+        *:*) IMAGE_REPOSITORY="${IMAGE_REPOSITORY%:*}" ;;
+      esac
+      case "$IMAGE_REPOSITORY" in
+        "$CONTAINER_REGISTRY"/*) ;;
+        */*)
+          image_host="${IMAGE_REPOSITORY%%/*}"
+          case "$image_host" in
+            *.*|*:*|localhost) ;;
+            *) IMAGE_REPOSITORY="${CONTAINER_REGISTRY}/${IMAGE_REPOSITORY}" ;;
+          esac
+          ;;
+        *) IMAGE_REPOSITORY="${CONTAINER_REGISTRY}/${IMAGE_REPOSITORY}" ;;
+      esac
+    - export IMAGE_SHA="${IMAGE_REPOSITORY}:${CI_COMMIT_SHORT_SHA}"
+    - export IMAGE_STABLE="${IMAGE_REPOSITORY}:${IMAGE_STABLE_TAG}"
+    - |
+      docker build \
+        --pull \
+        --secret id=DATABASE_URL,env=DATABASE_URL \
+        --secret id=JWT_SECRET,env=JWT_SECRET \
+        --tag "$IMAGE_SHA" \
+        --tag "$IMAGE_STABLE" \
+        .
+    - docker push "$IMAGE_SHA"
+    - docker push "$IMAGE_STABLE"
+    - printf 'IMAGE_REPOSITORY=%s\nIMAGE_SHA=%s\nIMAGE_STABLE=%s\n' "$IMAGE_REPOSITORY" "$IMAGE_SHA" "$IMAGE_STABLE" > deploy.env
+  artifacts:
+    reports:
+      dotenv: deploy.env
+
+deploy_production:
+  image: alpine:3.20
+  stage: deploy
+  needs:
+    - job: build_container
+      artifacts: true
+  environment:
+    name: production
+    url: https://alphabuiltconsultants.com
+  before_script:
+    - apk add --no-cache curl ca-certificates
+  script:
+    - test -n "$AZURE_WEBAPP_WEBHOOK_URL" || (echo "AZURE_WEBAPP_WEBHOOK_URL must be set in GitLab CI/CD variables." && exit 1)
+    - echo "Deploying $IMAGE_STABLE to Azure App Service production."
+    - |
+      curl --fail --show-error --silent --retry 5 --retry-delay 5 --retry-all-errors \
+        --request POST \
+        "$AZURE_WEBAPP_WEBHOOK_URL"
+    - echo "Waiting for Azure App Service to pull the new container..."
+    - sleep 30
+    - |
+      for attempt in $(seq 1 30); do
+        if curl --fail --silent --show-error --location "$AZURE_WEBAPP_URL" --output /dev/null; then
+          echo "Azure default hostname is responding."
+          break
+        fi
+
+        if [ "$attempt" = "30" ]; then
+          echo "Azure default hostname did not become healthy in time."
+          exit 1
+        fi
+
+        sleep 10
+      done
+    - |
+      for attempt in $(seq 1 30); do
+        if curl --fail --silent --show-error --location "$PRODUCTION_URL" --output /dev/null; then
+          echo "Production domain is responding."
+          exit 0
+        fi
+
+        if [ "$attempt" = "30" ]; then
+          echo "Production domain did not become healthy in time."
+          exit 1
+        fi
+
+        sleep 10
+      done

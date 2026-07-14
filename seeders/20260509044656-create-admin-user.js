@@ -1,3 +1,4 @@
+/* eslint-disable */
 'use strict';
 const bcrypt = require('bcryptjs');
 const db = require('../models/index.js').default;

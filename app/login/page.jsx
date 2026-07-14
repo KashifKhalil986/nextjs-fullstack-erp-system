@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useLogin } from "@/services/users/users";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,31 +12,27 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = async (e) => {
+  const loginMutation = useLogin();
+
+  const handleLogin = (e) => {
     e.preventDefault();
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    loginMutation.mutate(
+      { email, password },
+      {
+        onSuccess: (data) => {
+          if (data.user.role === "admin") {
+            router.replace("/dashboard");
+          } else {
+            router.replace("/");
+          }
         },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        data.user.role === "admin"
-          ? router.replace("/dashboard")
-          : router.replace("/");
-      } else {
-        alert(data.message || "Login failed");
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      alert("An error occurred during login");
-    }
+        onError: (error) => {
+          console.error("Login error:", error);
+          alert(error.message || "Login failed");
+        },
+      },
+    );
   };
 
   return (
